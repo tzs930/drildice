@@ -70,3 +70,40 @@ def estimate_hscic(X, Y, Z, ridge_lambda=1e-2, use_median=False, normalize_kerne
     # result3 = total_term / n
     
     return result
+
+def hsic_matrices(Kx, Ky, biased=False):
+    n = Kx.shape[0]
+
+    if biased:
+        a_vec = Kx.mean(dim=0)
+        b_vec = Ky.mean(dim=0)
+        # same as tr(HAHB)/m^2 for A=a_matrix, B=b_matrix, H=I - 11^T/m (centering matrix)
+        return (Kx * Ky).mean() - 2 * (a_vec * b_vec).mean() + a_vec.mean() * b_vec.mean()
+
+    else:
+        tilde_Kx = Kx - torch.diagflat(torch.diag(Kx))
+        tilde_Ky = Ky - torch.diagflat(torch.diag(Ky))
+
+        u = tilde_Kx * tilde_Ky
+        k_row = tilde_Kx.sum(dim=1)
+        l_row = tilde_Ky.sum(dim=1)
+        mean_term_1 = u.sum()  # tr(KL)
+        mean_term_2 = k_row.dot(l_row)  # 1^T KL 1
+        mu_x = tilde_Kx.sum()
+        mu_y = tilde_Ky.sum()
+        mean_term_3 = mu_x * mu_y
+
+        # Unbiased HISC.
+        mean = 1 / (n * (n - 3)) * (mean_term_1 - 2. / (n - 2) * mean_term_2 + 1 / ((n - 1) * (n - 2)) * mean_term_3)
+    return mean
+
+def estimate_hsic(X, Y, Kx_sigma2=1., Ky_sigma2=1., biased=False):
+    '''X ind. Y'''
+    # todo:
+    #  alternative implementation for RFF
+    #  biased/unbiased HSIC choice
+    #  faster implementation for biased
+    Kx = gaussian_kernel(X, sigma2=Kx_sigma2)
+    Ky = gaussian_kernel(Y, sigma2=Ky_sigma2)
+    
+    return hsic_matrices(Kx, Ky, biased)

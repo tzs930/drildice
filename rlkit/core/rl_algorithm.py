@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import gtimer as gt
 
-from rlkit.core import eval_util #logger,
+from rlkit.core import eval_util, logger
 from rlkit.data_management.replay_buffer import ReplayBuffer
 from rlkit.samplers.data_collector import DataCollector
 
@@ -56,9 +56,9 @@ class BaseRLAlgorithm(object, metaclass=abc.ABCMeta):
 
     def _end_epoch(self, epoch):
         snapshot = self._get_snapshot()
-        # logger.save_itr_params(epoch, snapshot)
+        logger.save_itr_params(epoch, snapshot)
         gt.stamp('saving')
-        # self._log_stats(epoch)
+        self._log_stats(epoch)
 
         self.expl_data_collector.end_epoch(epoch)
         self.eval_data_collector.end_epoch(epoch)
@@ -80,65 +80,65 @@ class BaseRLAlgorithm(object, metaclass=abc.ABCMeta):
             snapshot['replay_buffer/' + k] = v
         return snapshot
 
-    # def _log_stats(self, epoch):
-        # logger.log("Epoch {} finished".format(epoch), with_timestamp=True)
-        # logger.record_dict({"epoch": epoch})
+    def _log_stats(self, epoch):
+        logger.log("Epoch {} finished".format(epoch), with_timestamp=True)
+        logger.record_dict({"epoch": epoch})
 
-        # """
-        # Replay Buffer
-        # """
-        # logger.record_dict(
-        #     self.replay_buffer.get_diagnostics(),
-        #     prefix='replay_buffer/'
-        # )
+        """
+        Replay Buffer
+        """
+        logger.record_dict(
+            self.replay_buffer.get_diagnostics(),
+            prefix='replay_buffer/'
+        )
 
-        # """
-        # Trainer
-        # """
-        # logger.record_dict(self.trainer.get_diagnostics(), prefix='trainer/')
+        """
+        Trainer
+        """
+        logger.record_dict(self.trainer.get_diagnostics(), prefix='trainer/')
 
-        # """
-        # Exploration
-        # """
-        # logger.record_dict(
-        #     self.expl_data_collector.get_diagnostics(),
-        #     prefix='expl/'
-        # )
-        # expl_paths = self.expl_data_collector.get_epoch_paths()
-        # if hasattr(self.expl_env, 'get_diagnostics'):
-        #     logger.record_dict(
-        #         self.expl_env.get_diagnostics(expl_paths),
-        #         prefix='expl/',
-        #     )
-        # logger.record_dict(
-        #     eval_util.get_generic_path_information(expl_paths),
-        #     prefix="expl/",
-        # )
-        # """
-        # Evaluation
-        # """
-        # logger.record_dict(
-        #     self.eval_data_collector.get_diagnostics(),
-        #     prefix='eval/',
-        # )
-        # eval_paths = self.eval_data_collector.get_epoch_paths()
-        # if hasattr(self.eval_env, 'get_diagnostics'):
-        #     logger.record_dict(
-        #         self.eval_env.get_diagnostics(eval_paths),
-        #         prefix='eval/',
-        #     )
-        # logger.record_dict(
-        #     eval_util.get_generic_path_information(eval_paths),
-        #     prefix="eval/",
-        # )
+        """
+        Exploration
+        """
+        logger.record_dict(
+            self.expl_data_collector.get_diagnostics(),
+            prefix='expl/'
+        )
+        expl_paths = self.expl_data_collector.get_epoch_paths()
+        if hasattr(self.expl_env, 'get_diagnostics'):
+            logger.record_dict(
+                self.expl_env.get_diagnostics(expl_paths),
+                prefix='expl/',
+            )
+        logger.record_dict(
+            eval_util.get_generic_path_information(expl_paths),
+            prefix="expl/",
+        )
+        """
+        Evaluation
+        """
+        logger.record_dict(
+            self.eval_data_collector.get_diagnostics(),
+            prefix='eval/',
+        )
+        eval_paths = self.eval_data_collector.get_epoch_paths()
+        if hasattr(self.eval_env, 'get_diagnostics'):
+            logger.record_dict(
+                self.eval_env.get_diagnostics(eval_paths),
+                prefix='eval/',
+            )
+        logger.record_dict(
+            eval_util.get_generic_path_information(eval_paths),
+            prefix="eval/",
+        )
 
-        # """
-        # Misc
-        # """
-        # gt.stamp('logging')
-        # logger.record_dict(_get_epoch_timings())
-        # logger.record_tabular('Epoch', epoch)
-        # logger.dump_tabular(with_prefix=False, with_timestamp=False)
+        """
+        Misc
+        """
+        gt.stamp('logging')
+        logger.record_dict(_get_epoch_timings())
+        logger.record_tabular('Epoch', epoch)
+        logger.dump_tabular(with_prefix=False, with_timestamp=False)
 
     @abc.abstractmethod
     def training_mode(self, mode):

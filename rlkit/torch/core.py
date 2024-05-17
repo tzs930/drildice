@@ -60,7 +60,8 @@ def elem_or_tuple_to_numpy(elem_or_tuple):
 
 def _filter_batch(np_batch):
     for k, v in np_batch.items():
-        if v.dtype == np.bool:
+        # if v.dtype == np.bool:
+        if v.dtype == type(bool):
             yield k, v.astype(int)
         else:
             yield k, v

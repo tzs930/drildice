@@ -279,3 +279,233 @@ class EnvReplayBuffer(SimpleReplayBuffer):
             # **kwargs
         )
 
+
+class InitObsBuffer():
+    def __init__(
+            self,
+            env,
+            init_obs
+    ):
+        self.env = env
+        self.obs_mean = None
+        self.obs_std = None
+        
+        self._init_obss = init_obs
+        self._size = len(init_obs)
+        self._replace = False
+        
+    def set_statistics(self, obs_mean, obs_std):
+        self.obs_mean, self.obs_std = obs_mean, obs_std
+        
+    def random_batch(self, batch_size, standardize=False):
+        indices = np.random.choice(self._size, size=batch_size, replace=self._replace or self._size < batch_size)
+        if not self._replace and self._size < batch_size:
+            warnings.warn('Replace was set to false, but is temporarily set to true because batch size is larger than current size of replay.')
+
+        if standardize and self.obs_mean is not None:
+            init_obs = (self._init_obss[indices] - self.obs_mean) / self.obs_std
+            
+        else:
+            init_obs = self._init_obss[indices] 
+            
+        return init_obs
+    
+
+class MDPReplayBuffer(SimpleReplayBuffer):
+    def __init__(
+            self,
+            max_replay_buffer_size,
+            env,
+            obs_dim=None,
+            act_dim=None,
+            env_info_sizes=None
+    ):
+        """
+        :param max_replay_buffer_size:
+        :param env:
+        """
+        self.env = env
+        self._ob_space = env.observation_space  #.shape[0] * stack_size
+        self._action_space = env.action_space
+
+        # if train_with_action_history:
+        #     obs_dim = get_dim(self._ob_space) * stack_size + get_dim(self._action_space) * max(stack_size - 1, 1)
+        # else:
+        if obs_dim is None:
+            obs_dim = get_dim(self._ob_space)
+        
+        if act_dim is None:
+            act_dim = get_dim(self._action_space)
+
+        if env_info_sizes is None:
+            if hasattr(env, 'info_sizes'):
+                env_info_sizes = env.info_sizes
+            else:
+                env_info_sizes = dict()
+
+        super().__init__(
+            max_replay_buffer_size=max_replay_buffer_size,
+            observation_dim=obs_dim,
+            action_dim=act_dim,
+            env_info_sizes=env_info_sizes
+        )
+
+        self.obs_mean = None
+        self.obs_std = None
+
+        self.act_mean = None
+        self.act_std = None
+
+    # def add_sample(self, observation, action, prev_action, reward, terminal,
+    #                next_observation, **kwargs):
+    #     if isinstance(self._action_space, Discrete):
+    #         new_action = np.zeros(self._action_dim)
+    #         new_action[action] = 1
+    #     else:
+    #         new_action = action
+
+    #     return super().add_sample(
+    #         observation=observation,
+    #         action=new_action,
+    #         prev_action=prev_action,
+    #         reward=reward,
+    #         next_observation=next_observation,
+    #         terminal=terminal,
+    #         # **kwargs
+    #     )
+
+    def calculate_statistics(self):
+        self.obs_mean = np.mean(self._observations[:self._top], axis=0, keepdims=True)
+        self.obs_std = np.std(self._observations[:self._top], axis=0, keepdims=True)
+
+        self.act_mean = np.mean(self._actions[:self._top], axis=0, keepdims=True)
+        self.act_std = np.std(self._actions[:self._top], axis=0, keepdims=True)
+
+        return self.obs_mean, self.obs_std, self.act_mean, self.act_std
+
+    def set_statistics(self, obs_mean, obs_std, act_mean, act_std):
+        self.obs_mean, self.obs_std, self.act_mean, self.act_std = obs_mean, obs_std, act_mean, act_std
+        
+    def get_statistics(self):
+        return self.obs_mean, self.obs_std, self.act_mean, self.act_std
+
+    def random_batch(self, batch_size, standardize=False):
+        indices = np.random.choice(self._size, size=batch_size, replace=self._replace or self._size < batch_size)
+        if not self._replace and self._size < batch_size:
+            warnings.warn('Replace was set to false, but is temporarily set to true because batch size is larger than current size of replay.')
+
+        if standardize and self.obs_mean is not None:
+            obss = (self._observations[indices] - self.obs_mean) / self.obs_std
+            # actions = (self._actions[indices] - self.act_mean) / self.act_std
+            next_obss = (self._next_obs[indices] - self.obs_mean) / self.obs_std
+        else:
+            obss = self._observations[indices] 
+            # actions = self._actions[indices]           
+            next_obss = self._next_obs[indices]
+
+        actions = self._actions[indices]
+        
+        batch = dict(
+            observations=obss,
+            actions=actions,
+            # prev_actions=self._prev_actions[indices],
+            rewards=self._rewards[indices],
+            terminals=self._terminals[indices],
+            next_observations=next_obss,
+        )
+        for key in self._env_info_keys:
+            assert key not in batch.keys()
+            batch[key] = self._env_infos[key][indices]
+
+        return batch
+    
+    def random_batch_weighted_sampling(self, batch_size, sample_weights=None, standardize=False):
+        if sample_weights is None:
+            indices = np.random.choice(self._size, size=batch_size, replace=self._replace or self._size < batch_size)
+        else:
+            weight_sum = sample_weights.sum()
+            sample_weights = sample_weights / weight_sum
+            
+            indices = np.random.choice(self._size, p=sample_weights, size=batch_size, replace=True)
+        
+        
+        if not self._replace and self._size < batch_size:
+            warnings.warn('Replace was set to false, but is temporarily set to true because batch size is larger than current size of replay.')
+
+        if standardize and self.obs_mean is not None:
+            obss = (self._observations[indices] - self.obs_mean) / self.obs_std
+            # actions = (self._actions[indices] - self.act_mean) / self.act_std
+            next_obss = (self._next_obs[indices] - self.obs_mean) / self.obs_std
+        else:
+            obss = self._observations[indices] 
+            # actions = self._actions[indices]           
+            next_obss = self._next_obs[indices]
+
+        actions = self._actions[indices]
+        
+        batch = dict(
+            observations=obss,
+            actions=actions,
+            # prev_actions=self._prev_actions[indices],
+            rewards=self._rewards[indices],
+            terminals=self._terminals[indices],
+            next_observations=next_obss,
+        )
+        for key in self._env_info_keys:
+            assert key not in batch.keys()
+            batch[key] = self._env_infos[key][indices]
+
+        return batch
+    
+    def get_batch(self, batch_size=None, standardize=False):
+        if batch_size is not None:
+            datasize = min(batch_size, self._top)
+        else:
+            datasize = self._top
+            
+        indices = np.arange(datasize)
+        # if not self._replace and self._size < batch_size:
+        #     warnings.warn('Replace was set to false, but is temporarily set to true because batch size is larger than current size of replay.')
+
+        if standardize and self.obs_mean is not None:
+            obss = (self._observations[indices] - self.obs_mean) / self.obs_std
+            # actions = (self._actions[indices] - self.act_mean) / self.act_std
+            next_obss = (self._next_obs[indices] - self.obs_mean) / self.obs_std
+        else:
+            obss = self._observations[indices] 
+            # actions = self._actions[indices]           
+            next_obss = self._next_obs[indices]
+
+        actions = self._actions[indices]
+        
+        batch = dict(
+            observations=obss,
+            actions=actions,
+            # prev_actions=self._prev_actions[indices],
+            rewards=self._rewards[indices],
+            terminals=self._terminals[indices],
+            next_observations=next_obss,
+        )
+        for key in self._env_info_keys:
+            assert key not in batch.keys()
+            batch[key] = self._env_infos[key][indices]
+
+        return batch
+
+    def add_sample(self, observation, action, reward, terminal,
+                   next_observation, **kwargs):
+        if isinstance(self._action_space, Discrete):
+            new_action = np.zeros(self._action_dim)
+            new_action[action] = 1
+        else:
+            new_action = action
+
+        return super().add_sample(
+            observation=observation,
+            action=new_action,
+            reward=reward,
+            next_observation=next_observation,
+            terminal=terminal,
+            # **kwargs
+        )
+

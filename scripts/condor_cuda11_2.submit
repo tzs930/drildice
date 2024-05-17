@@ -1,0 +1,15 @@
+Executable              = scripts/condor_cuda11_2.sh
+Arguments               = $(process)
+requirements            = (Machine=="c04"||Machine=="c07"||Machine=="c08"||Machine=="c09"||Machine=="c10"||Machine=="c11"||Machine=="c12"||Machine=="c13"||Machine=="c28"||Machine=="c29"||Machine=="c30"||Machine=="c33"||Machine=="c43"||Machine=="c44"||Machine=="c45")
+#requirements            = (Machine=="c03"||Machine=="c07"||Machine=="c09"||Machine=="c43"||Machine=="c44"||Machine=="c45")
+should_transfer_files   = YES 
+when_to_transfer_output = ON_EXIT_OR_EVICT
+Output                  = condor/$(cluster)/$(process).out
+Log                     = condor/$(cluster)/$(process).log
+Error                   = condor/$(cluster)/$(process).err
+RequestCpus             = 4
+RequestMemory           = 7500
+getenv                  = True
+priority                = 0
+
+queue 360

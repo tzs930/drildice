@@ -1,6 +1,8 @@
 import os
 wandb_dir = './wandb_offline'
+# os.environ["WANDB_MODE"]="offline"
 os.environ['WANDB_DIR'] = wandb_dir
+os.environ['WANDB_TIMEOUT_WAIT'] = '3000'
 os.environ['D4RL_DATASET_DIR'] = './dataset'
 import wandb
 import envs
@@ -34,7 +36,10 @@ STD_EPSILON = 1e-8
 def train(configs):
     env = NormalizedBoxEnv(gym.make(configs['envname']))
     # obs_dim    = env.observation_space.low.size + 1 ## absorbing
-    obs_dim    = env.observation_space.low.size 
+    if configs['add_absorbing_state']:
+        obs_dim    = env.observation_space.low.size + 1 ## absorbing
+    else:
+        obs_dim    = env.observation_space.low.size 
     action_dim = env.action_space.low.size
     
     d4rl_env = gym.make(configs['d4rl_env_name'])
@@ -47,25 +52,27 @@ def train(configs):
     
     envname, envtype = configs['envname'], configs['envtype']
     
-    traj_load_path = configs['traj_load_path']
-    print(f'-- Loading dataset from {traj_load_path}...')
+    # traj_load_path = configs['traj_load_path']
+    # print(f'-- Loading dataset from {traj_load_path}...')
+    print(f'-- Loading dataset ...')
     dataset = d4rl_env.get_dataset()
+    # with open(traj_load_path, 'rb') as f:
+    #     dataset = pickle.load(f)
     print(f'-- Done!')
     
     print(f'-- Preprocessing dataset... ({envtype}, {stacksize})')
     # path = preprocess_dataset_with_prev_actions(dataset, envtype, stacksize, configs['partially_observable'], action_history_len=2)    
     
-    # train_data = data_select_num_transitions(path, configs['train_data_num'])
-    # valid_data = data_select_num_transitions(path, configs['valid_data_num'], start_idx=900000)
     train_data, n_train = preprocess_dataset_with_subsampling(dataset, configs['idxfile'], start_traj_idx=0, 
                                                      num_trajs=configs['train_num_trajs'],
-                                                     add_absorbing_state=False)
+                                                     add_absorbing_state=configs['add_absorbing_state'])
     valid_data, n_valid = preprocess_dataset_with_subsampling(dataset, configs['idxfile'], start_traj_idx=900, 
                                                      num_trajs=configs['valid_num_trajs'],
-                                                     add_absorbing_state=False)
+                                                     add_absorbing_state=configs['add_absorbing_state'])
     
     # valid_data = preprocess_dataset(dataset, start_idx=900000, num_dataset=configs['valid_data_num'])
-    # preprocess_dataset_with_subsampling(dataset, configs['idxfile'], start_traj_idx=-configs['valid_num_trajs'], num_trajs=configs['valid_num_trajs'])
+    # preprocess_dataset_with_subsampling(dataset, configs['idxfile'], 
+    #                                     start_traj_idx=-configs['valid_num_trajs'], num_trajs=configs['valid_num_trajs'])
     
     # train_data = preprocess_dataset(dataset, start_idx=0, num_dataset=configs['train_data_num'])
     # valid_data = preprocess_dataset(dataset, start_idx=900000, num_dataset=configs['valid_data_num'])
@@ -107,7 +114,9 @@ def train(configs):
         init_obs_buffer_valid.set_statistics(obs_mean, obs_std)
         
     # to use wandb, initialize here, e.g.
-    wandb.init(project='DICEBC_240427', dir=wandb_dir, config=configs, entity='tzs930')
+    wandb.Settings(init_timeout=3000, _service_wait=3000)
+    wandb.init(project='DICEBC_240516_imbalanced', dir=wandb_dir, config=configs, entity='tzs930')
+    
     # wandb = None
         
     if 'DICEBC' in configs['method']:
@@ -151,7 +160,8 @@ def train(configs):
             n_valid=n_valid,
             weight_norm=configs['weight_norm'],
             train_lambda=configs['train_lambda'],
-            weighted_replay_sampling =configs['weighted_replay_sampling'] 
+            weighted_replay_sampling =configs['weighted_replay_sampling'] ,
+            add_absorbing_state=configs['add_absorbing_state']
         )
 
         trainer.train(total_iteration = configs['total_iteration'],
@@ -199,7 +209,8 @@ def train(configs):
             n_valid=n_valid,
             weight_norm=configs['weight_norm'],
             train_lambda=configs['train_lambda'],
-            weighted_replay_sampling =configs['weighted_replay_sampling'] 
+            weighted_replay_sampling =configs['weighted_replay_sampling'] ,
+            add_absorbing_state=configs['add_absorbing_state']
         )
 
         trainer.train(total_iteration = configs['total_iteration'],
@@ -246,7 +257,8 @@ def train(configs):
             n_valid=n_valid,
             weight_norm=configs['weight_norm'],
             train_lambda=configs['train_lambda'],
-            weighted_replay_sampling =configs['weighted_replay_sampling'] 
+            weighted_replay_sampling =configs['weighted_replay_sampling'] , 
+            add_absorbing_state=configs['add_absorbing_state']
         )
 
         trainer.train(total_iteration = configs['total_iteration'],
@@ -294,7 +306,8 @@ def train(configs):
             n_valid=n_valid,
             weight_norm=configs['weight_norm'],
             train_lambda=configs['train_lambda'],
-            weighted_replay_sampling =configs['weighted_replay_sampling'] 
+            weighted_replay_sampling =configs['weighted_replay_sampling'] ,
+            add_absorbing_state=configs['add_absorbing_state']
         )
 
         trainer.train(total_iteration = configs['total_iteration'],
@@ -334,7 +347,8 @@ def train(configs):
             standardize=configs['standardize'],
             expert_policy=configs['expert_policy'],
             n_train=n_train,
-            n_valid=n_valid
+            n_valid=n_valid,
+            add_absorbing_state=configs['add_absorbing_state']
         )
 
         trainer.train(total_iteration = configs['total_iteration'],
@@ -366,9 +380,12 @@ if __name__ == "__main__":
                         ('OPTIDICEIL',        0.001,  0.99),
                         ('OPTIDICEIL',        0.01,   0.99),
                         ('OPTIDICEIL',        0.1,    0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.001,  0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.01,   0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.1,    0.99),
+                        ('DICEBC',    0.001,  0.99),
+                        ('DICEBC',    0.01,   0.99),
+                        ('DICEBC',    0.1,    0.99),
+                        ('DICEBC-WN', 0.001,  0.99),
+                        ('DICEBC-WN', 0.01,   0.99),
+                        ('DICEBC-WN', 0.1,    0.99),
                         # ('DICEBC', 0.001, 1.0),                        
                         # ('DICEBC',      0.001, 0.99),
                         # ('DICEBC',      0.01,  0.99),
@@ -429,28 +446,29 @@ if __name__ == "__main__":
     # candidates: 'Hopper', 'Walker2d', 'HalfCheetah', 'Ant'
     # envlist           = ['Hopper', 'Walker2d'] #, 'HalfCheetah'] # , 'Walker2d', 'HalfCheetah'] #, 'HalfCheetah'] #, 'Ant']
     stacksizelist     = [0]
-    seedlist          = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    seedlist          = [0, 1, 2, 3, 4]
     batch_size_list   = [512]
     # num_trajs_list    = [100, 150, 200]
     env_num_trajs_list = [
-                            ('Hopper',      [10,20,30,40,50]),
-                            ('Walker2d',    [10,20,30,40,50]),
-                            ('HalfCheetah', [50,100,150,200,250]),
+                            ('Hopper',      [100]),
+                            ('Walker2d',    [100]),
+                            ('HalfCheetah', [500]),
                          ]
-    num_trajs_idx_list = [0,1,2,3,4]
+    num_trajs_idx_list = [0]
     train_lambda_list = [False]
     inner_steps_list  = [1]
-    subsample_dist_list = ['uniform']
+    subsample_dist_list = ['state-dependent', 'action-dependent']
+    ratio_list = [0.1, 0.5, 0.9] 
     # subsample_dist_list = ['geometric-frags']
     # subsample_freq_list = [20]
     # gamma_list          = [0.99, 0.999, 0.9999]
     
     standardize = True    
     
-    env_num_trajs, method_reg_gamma, inner_steps, seed, batch_size, num_trajs_idx, train_lambda, subsample_dist = \
-        list(product(env_num_trajs_list, method_reg_gamma_list, inner_steps_list, seedlist, batch_size_list, num_trajs_idx_list, train_lambda_list, subsample_dist_list))[pid]    
+    seed, env_num_trajs, method_reg_gamma, inner_steps, batch_size, num_trajs_idx, train_lambda, subsample_dist, ratio = \
+        list(product(seedlist, env_num_trajs_list, method_reg_gamma_list, inner_steps_list, batch_size_list, num_trajs_idx_list, train_lambda_list, subsample_dist_list, ratio_list))[pid]    
     
-    subsample_freq = 20
+    subsample_num = 50
     envtype, num_trajs_list = env_num_trajs
     num_trajs = num_trajs_list[num_trajs_idx]
     
@@ -471,27 +489,19 @@ if __name__ == "__main__":
         envname = f'PO{envtype}-v0'
         
     envtype_lower = envtype.lower()
-    traj_load_path = f'/tmp/{envtype_lower}_expert-v2.hdf5'
+    # traj_load_path = f'/tmp/{envtype_lower}_expert-v2.hdf5'
     d4rl_env_name = f'{envtype_lower}-expert-v2'
 
     num_trajs = num_trajs
     
-    if subsample_dist == 'uniform':
-        idxfilename = f'results/{d4rl_env_name}-uniform-freq{subsample_freq}-idx.pickle'
-    elif subsample_dist == 'uniform-frags':
-        idxfilename = f'results/{d4rl_env_name}-uniform-fragments-n{subsample_freq}-idx.pickle'
-    elif subsample_dist == 'uniform-frags+full-trajs1':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1.pickle'
-        # idxfilename = f'results/{d4rl_env_name}-uniform-fragments-n{subsample_freq}-idx-num_full_trajs1-no-init.pickle'
-    elif subsample_dist == 'geometric':
-        idxfilename = f'results/{d4rl_env_name}-geometric-n50-idx.pickle'
-    elif subsample_dist == 'geometric-frags':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx.pickle'
-    elif subsample_dist == 'geometric-frags+full-trajs1':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1.pickle'
-        # idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1-no-init.pickle'
-    elif subsample_dist == 'beta':
-        idxfilename = f'results/{d4rl_env_name}-beta-n50-idx.pickle'
+    if subsample_dist == 'expert-relabel':
+        traj_load_path = f'results/{d4rl_env_name}-expert-relabel-full-trajs.pickle'
+        idxfilename = f'results/{d4rl_env_name}-expert-relabel-idx-dict.pickle'
+        
+    elif subsample_dist == 'state-dependent' or subsample_dist == 'action-dependent':
+        # traj_load_path = f'results/{d4rl_env_name}-state-dependent-n{}-r{ratio}-full-trajs.pickle'
+        idxfilename = f'results/{d4rl_env_name}-{subsample_dist}-n{subsample_num}-r{ratio}-idx-l2-median-full-trajs1.pickle'
+    
     else:
         raise NotImplementedError
     
@@ -519,7 +529,7 @@ if __name__ == "__main__":
         replay_buffer_size=int(1E6),
         traj_load_path='',
         train_num_trajs=num_trajs,
-        valid_num_trajs=int(num_trajs*0.2),
+        valid_num_trajs=5,
         # valid_num_trajs=None,
         # valid_data_num=5000,
         idxfile=idxfile,
@@ -547,11 +557,13 @@ if __name__ == "__main__":
         subsample_dis=subsample_dist,
         weight_norm=weight_norm,
         train_lambda=train_lambda,
-        weighted_replay_sampling =weighted_replay_sampling 
+        weighted_replay_sampling =weighted_replay_sampling ,
+        add_absorbing_state=True,
+        imbalance_ratio=ratio
     )
 
-    configs['traj_load_path'] = traj_load_path
-    configs['save_policy_path'] = f'results/{envname}/{algorithm}/inner_steps{inner_steps}/alpha{reg_coef}/num_trajs{num_trajs}/seed{seed}'
+    configs['traj_load_path'] = None
+    configs['save_policy_path'] = f'results/{envname}/{subsample_dist}/{algorithm}/alpha{reg_coef}/num_trajs{num_trajs}/seed{seed}'
     
     # print(configs)
     train(configs)
