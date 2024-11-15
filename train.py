@@ -13,7 +13,8 @@ import torch
 import time
 
 from imitation.bc import BC
-from imitation.drildice import DRILDICE
+from imitation.drbc import DRBC
+from imitation.drildice import DrilDICE
 from imitation.optidiceil import OptiDICEIL
 from imitation.aw import AdvWBC
 from imitation.demodice import DemoDICE
@@ -100,7 +101,7 @@ def train(configs):
     # to use wandb, initialize here, e.g.
     # wandb = None
         
-    if 'DRILDICE' in configs['method']:
+    if 'DrilDICE' in configs['method']:
         policy = TanhGaussianPolicy(
             hidden_sizes=configs['layer_sizes'],
             obs_dim=obs_dim ,
@@ -115,7 +116,7 @@ def train(configs):
             device=device
         )
        
-        trainer = DRILDICE(
+        trainer = DrilDICE(
             policy = policy,
             best_policy = best_policy,
             env = env,
@@ -243,6 +244,47 @@ def train(configs):
                       eval_freq = configs['eval_freq'],
                       batch_size = configs['batch_size'])
         
+    elif 'DRBC' in configs['method']:
+        policy = TanhGaussianPolicy(
+            hidden_sizes=configs['layer_sizes'],
+            obs_dim=obs_dim ,
+            action_dim=action_dim,
+            device=device
+        )
+        
+        best_policy = TanhGaussianPolicy(
+            hidden_sizes=configs['layer_sizes'],
+            obs_dim=obs_dim ,
+            action_dim=action_dim,            
+            device=device
+        )
+       
+        trainer = DRBC(
+            policy = policy,
+            best_policy = best_policy,
+            env = env,
+            replay_buffer = replay_buffer,
+            replay_buffer_valid = replay_buffer_valid,
+            seed = configs['seed'],
+            device = device,
+            envname = envname,
+            lr = configs['lr'],
+            save_policy_path = configs['save_policy_path'],
+            obs_dim = obs_dim,
+            action_dim = action_dim,            
+            stacksize = stacksize,
+            wandb = wandb,            
+            standardize=configs['standardize'],
+            expert_policy=configs['expert_policy'],
+            n_train=n_train,
+            n_valid=n_valid,
+            rho=configs['reg_coef']
+        )
+
+        trainer.train(total_iteration = configs['total_iteration'],
+                      eval_freq = configs['eval_freq'],
+                      batch_size = configs['batch_size'])
+        
     elif 'OPTIDICEIL' in configs['method']:
         policy = TanhGaussianPolicy(
             hidden_sizes=configs['layer_sizes'],
@@ -343,7 +385,7 @@ if __name__ == "__main__":
 
     time.sleep(pid%60 * 10)
     # Hyperparameter Grid
-    # candidates: 'BC', 'DemoDICE', 'ADVWBC', 'OPTIDICEIL', 'DRILDICE'
+    # candidates: 'BC', 'DRBC', 'DemoDICE', 'ADVWBC', 'OPTIDICEIL', 'DrilDICE'
     method_reg_gamma_list = [
                         ('BC',                0.,     1.0),
                     ]
@@ -415,9 +457,6 @@ if __name__ == "__main__":
     expert_policy_path = f'dataset/{envtype_lower}_params.sampler.onnx'
     expert_policy = ort.InferenceSession(expert_policy_path)
     
-    # if 'WRB' in method:
-    #     weighted_replay_sampling = True
-    # else:
     weighted_replay_sampling = False
         
     if ('WN' in method) or ('DemoDICE' in method) or ('ADVWBC' in method):
