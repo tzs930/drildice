@@ -13,7 +13,7 @@ import torch
 import time
 
 from imitation.bc import BC
-from imitation.dicebc import DICEBC
+from imitation.drildice import DRILDICE
 from imitation.optidiceil import OptiDICEIL
 from imitation.aw import AdvWBC
 from imitation.demodice import DemoDICE
@@ -23,7 +23,7 @@ from itertools import product
 
 from core.policy import TanhGaussianPolicy
 from core.replay_buffer import InitObsBuffer, MDPReplayBuffer
-from core.preprocess import preprocess_dataset, preprocess_dataset_with_subsampling
+from core.preprocess import preprocess_dataset_with_subsampling
 from rlkit.envs.wrappers import NormalizedBoxEnv
 
 import onnx
@@ -53,10 +53,6 @@ def train(configs):
     print(f'-- Done!')
     
     print(f'-- Preprocessing dataset... ({envtype}, {stacksize})')
-    # path = preprocess_dataset_with_prev_actions(dataset, envtype, stacksize, configs['partially_observable'], action_history_len=2)    
-    
-    # train_data = data_select_num_transitions(path, configs['train_data_num'])
-    # valid_data = data_select_num_transitions(path, configs['valid_data_num'], start_idx=900000)
     train_data, n_train = preprocess_dataset_with_subsampling(dataset, configs['idxfile'], start_traj_idx=0, 
                                                      num_trajs=configs['train_num_trajs'],
                                                      add_absorbing_state=False)
@@ -64,11 +60,6 @@ def train(configs):
                                                      num_trajs=configs['valid_num_trajs'],
                                                      add_absorbing_state=False)
     
-    # valid_data = preprocess_dataset(dataset, start_idx=900000, num_dataset=configs['valid_data_num'])
-    # preprocess_dataset_with_subsampling(dataset, configs['idxfile'], start_traj_idx=-configs['valid_num_trajs'], num_trajs=configs['valid_num_trajs'])
-    
-    # train_data = preprocess_dataset(dataset, start_idx=0, num_dataset=configs['train_data_num'])
-    # valid_data = preprocess_dataset(dataset, start_idx=900000, num_dataset=configs['valid_data_num'])
     
     print(f'** num. of train data : {n_train},   num. of valid data : {n_valid}')
     
@@ -107,10 +98,9 @@ def train(configs):
         init_obs_buffer_valid.set_statistics(obs_mean, obs_std)
         
     # to use wandb, initialize here, e.g.
-    wandb.init(project='DICEBC_240427', dir=wandb_dir, config=configs, entity='tzs930')
     # wandb = None
         
-    if 'DICEBC' in configs['method']:
+    if 'DRILDICE' in configs['method']:
         policy = TanhGaussianPolicy(
             hidden_sizes=configs['layer_sizes'],
             obs_dim=obs_dim ,
@@ -125,7 +115,7 @@ def train(configs):
             device=device
         )
        
-        trainer = DICEBC(
+        trainer = DRILDICE(
             policy = policy,
             best_policy = best_policy,
             env = env,
@@ -351,87 +341,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
     pid = args.pid
 
-    # valid_pids = [221, 240, 241, 248, 253, 257, 258, 260, 265, 269, 270, 273, 276, 277, 281, 282, 283, 284, 286, 288, 289, 290, 292, 293] \
-    #     + list(np.arange(294,421)) + [515, 639, 646, 654, 657, 658, 659, 660, 665, 666, 667, 669, 671, 677, 678, 681, 683] + list(np.arange(686, 780))
-    
-    # if pid in valid_pids:    
     time.sleep(pid%60 * 10)
     # Hyperparameter Grid
-    # methodlist        = ['BC',     'HSICBC']           # candidates: 'BC', 'RAP', 'FCA', 'MINE', 'PALR'
-    # reg_coef_list     = [0.01, 0.1, 1., 10., 100.]
+    # candidates: 'BC', 'DemoDICE', 'ADVWBC', 'OPTIDICEIL', 'DRILDICE'
     method_reg_gamma_list = [
                         ('BC',                0.,     1.0),
-                        ('DemoDICEv2',        0,      0.99),
-                        ('ADVWBC',            0,      1.0),
-                        ('OPTIDICEIL',        0.001,  0.99),
-                        ('OPTIDICEIL',        0.01,   0.99),
-                        ('OPTIDICEIL',        0.1,    0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.001,  0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.01,   0.99),
-                        ('DICEBC-NU0-OBS-WB', 0.1,    0.99),
-                        # ('DICEBC', 0.001, 1.0),                        
-                        # ('DICEBC',      0.001, 0.99),
-                        # ('DICEBC',      0.01,  0.99),
-                        # ('DICEBC',      0.1,   0.99),                        
-                        # ('OPTIDICEIL',  0.01,  0.99),                        
-                        # ('DICEBC-NU0-OBS',    0.001, 0.9999),
-                        # ('DICEBC-NU0-OBS-WB', 0.001, 0.9999),
-                        # ('DICEBC-NU0-OBS-WB', 0.001, 0.99),
-                        # ('DICEBC-NU0-OBS',    0.1,   0.9999),                        
-                        # ('DICEBC-NU0-OBS-WB', 0.1,   0.9999),
-                        # ('DICEBC-NU0-OBS-WB', 0.1,   0.99),                       
-                        # ('DICEBC', 10., 1.0),
-                        # ('DICEBC', 1000., 0.9999),
-                        # ('OPTIDICEIL', 0.001, 1.0),
-                        # ('OPTIDICEIL', 0.001, 0.9999),
-                        # ('OPTIDICEIL', 0.1, 1.0),
-                        # ('OPTIDICEIL', 0.1, 0.9999),
-                        # ('OPTIDICEIL', 10., 1.0),
-                        # ('OPTIDICEIL', 10., 0.9999),
-                        # ('OPTIDICEIL', 1000., 1.0),
-                        # ('OPTIDICEIL', 1000., 0.9999),
-                        # ('DICEBC-WN', 0.001, 1.0),
-                        # ('DICEBC-WN', 0.001, 0.9999),
-                        # ('DICEBC-WN', 0.1, 1.0),
-                        # ('DICEBC-WN', 0.1, 0.9999),
-                        # ('DICEBC-WN', 10., 1.0),
-                        # ('DICEBC-WN', 1000., 0.9999),
-                        # ('OPTIDICEIL-WN', 0.001, 1.0),
-                        # ('OPTIDICEIL-WN', 0.001, 0.9999),
-                        # ('BC', 0., 1.0),
-                        # ('DICEBC-WRB', 0.001, 0.9999),                        
-                        # ('DICEBC-WRB', 0.01, 0.9999),
-                        # ('DICEBC-WRB', 0.1, 0.9999),
-                        # ('DICEBC-WRB', 1., 0.9999),
-                        # ('DICEBC-WRB', 10., 0.9999),
-                        # ('OPTIDICEIL', 0.001, 0.9999),
-                        # ('OPTIDICEIL', 0.01, 0.9999),
-                        # ('OPTIDICEIL', 0.1, 0.9999),
-                        # ('OPTIDICEIL', 1., 0.9999),
-                        # ('OPTIDICEIL', 0.001, 1.0),
-                        # ('OPTIDICEIL', 0.01, 1.0),
-                        # ('OPTIDICEIL', 0.1, 1.0),                        
-                        # ('DICEBCv2', 0.001, 1.0),
-                        # ('DICEBCv2', 0.01,  1.0),
-                        # ('DICEBCv2', 0.1,   1.0),
-                        # ('DICEBCv2', 1.,    1.0),
-                        # ('DICEBCv2', 10.,   1.0),
-                        # ('DICEBC', 0.1),
-                        # ('BCv2', 0., 0.99),                        
-                        # ('DICEBCv2', 0.01, 0.99),
-                        # ('DICEBCv2', 0.01, 0.999),
-                        # ('DICEBCv2', 0.01, 0.9999),
-                        # ('DICEBCv2', 0.001, 0.99),
-                        # ('DICEBCv2', 0.001, 0.999),
-                        # ('DICEBCv2', 0.001, 0.9999),   
                     ]
 
-    # candidates: 'Hopper', 'Walker2d', 'HalfCheetah', 'Ant'
-    # envlist           = ['Hopper', 'Walker2d'] #, 'HalfCheetah'] # , 'Walker2d', 'HalfCheetah'] #, 'HalfCheetah'] #, 'Ant']
     stacksizelist     = [0]
     seedlist          = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     batch_size_list   = [512]
-    # num_trajs_list    = [100, 150, 200]
     env_num_trajs_list = [
                             ('Hopper',      [10,20,30,40,50]),
                             ('Walker2d',    [10,20,30,40,50]),
@@ -440,25 +359,22 @@ if __name__ == "__main__":
     num_trajs_idx_list = [0,1,2,3,4]
     train_lambda_list = [False]
     inner_steps_list  = [1]
-    subsample_dist_list = ['uniform']
-    # subsample_dist_list = ['geometric-frags']
-    # subsample_freq_list = [20]
-    # gamma_list          = [0.99, 0.999, 0.9999]
+    subsample_dist_list = ['beta']
+    # Scenario 1 : 'action-dependent', 'state-depedent'
+    # Scenario 2 : 'beta'
+    # Scenario 3 : 'geometric-frags+full-trajs1'
     
     standardize = True    
     
     env_num_trajs, method_reg_gamma, inner_steps, seed, batch_size, num_trajs_idx, train_lambda, subsample_dist = \
         list(product(env_num_trajs_list, method_reg_gamma_list, inner_steps_list, seedlist, batch_size_list, num_trajs_idx_list, train_lambda_list, subsample_dist_list))[pid]    
     
-    subsample_freq = 20
+    subsample_num = 50
     envtype, num_trajs_list = env_num_trajs
     num_trajs = num_trajs_list[num_trajs_idx]
     
     method, reg_coef, gamma = method_reg_gamma
     stacksize = 0
-    
-    # if method == 'BC':
-    #     reg_coef = 0.
     
     ib_coef = 0.
     algorithm = f'{method}'
@@ -477,19 +393,17 @@ if __name__ == "__main__":
     num_trajs = num_trajs
     
     if subsample_dist == 'uniform':
-        idxfilename = f'results/{d4rl_env_name}-uniform-freq{subsample_freq}-idx.pickle'
+        idxfilename = f'results/{d4rl_env_name}-uniform-freq{subsample_num}-idx.pickle'
     elif subsample_dist == 'uniform-frags':
-        idxfilename = f'results/{d4rl_env_name}-uniform-fragments-n{subsample_freq}-idx.pickle'
+        idxfilename = f'results/{d4rl_env_name}-uniform-fragments-n{subsample_num}-idx.pickle'
     elif subsample_dist == 'uniform-frags+full-trajs1':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1.pickle'
-        # idxfilename = f'results/{d4rl_env_name}-uniform-fragments-n{subsample_freq}-idx-num_full_trajs1-no-init.pickle'
+        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_num}-idx-num_full_trajs1.pickle'
     elif subsample_dist == 'geometric':
         idxfilename = f'results/{d4rl_env_name}-geometric-n50-idx.pickle'
     elif subsample_dist == 'geometric-frags':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx.pickle'
+        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_num}-idx.pickle'
     elif subsample_dist == 'geometric-frags+full-trajs1':
-        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1.pickle'
-        # idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_freq}-idx-num_full_trajs1-no-init.pickle'
+        idxfilename = f'results/{d4rl_env_name}-geometric-fragments-n{subsample_num}-idx-num_full_trajs1.pickle'
     elif subsample_dist == 'beta':
         idxfilename = f'results/{d4rl_env_name}-beta-n50-idx.pickle'
     else:
@@ -520,8 +434,6 @@ if __name__ == "__main__":
         traj_load_path='',
         train_num_trajs=num_trajs,
         valid_num_trajs=int(num_trajs*0.2),
-        # valid_num_trajs=None,
-        # valid_data_num=5000,
         idxfile=idxfile,
         eval_freq=10000,
         lr=3e-5,

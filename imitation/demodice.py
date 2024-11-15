@@ -7,8 +7,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 import os
 
-from core.hscic import estimate_hscic, estimate_hsic
-
 def copy_nn_module(source, target):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)

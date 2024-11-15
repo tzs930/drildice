@@ -1,7 +1,6 @@
-# Implementation Code for PALR (Past Action Leakage Regularization) 
+# Implementation Code for DrilDICE (NeurIPS 2024)
 
-- This code contains official implementation codes of PALR, which is used to produce experimental results in the original paper presented in NeurIPS 2023 ([pdf](https://openreview.net/pdf?id=XpmJNP8BVA)).
-- This code contains PALR and its baseline 4 methods (BC, FCA, MINE, RAP).
+- This code contains official implementation codes of DrilDICE and basellines.
 
 ### 1. Prerequisites
 
@@ -9,7 +8,7 @@
 
 ```
 conda env create -f environment.yml
-conda activate palr
+conda activate drildice
 pip install d4rl
 ```
 
@@ -18,28 +17,17 @@ pip install d4rl
 python download_d4rl_dataset.py
 ```
 
-### 2. Train & Evaluate PALR
+### 2. Generate indices of subsampling method
+```
+python generate_subsmaple_indices.py
+```
+
+### 3. Train & Evaluate DrilDICE
 - Train imitation policies using `main.py`.
-For the ease of hyperparameter search, `pid` pass into main code and `pid`-th configuration of the overall grid will be executed.
-Note that the default setting is:
+
+### Toy Domain:
+- To run Four Rooms env., you should get MOSEK license.
 ```
-    methodlist        = ['BC', 'RAP', 'FCA', 'MINE', 'PALR']
-    envlist           = ['Hopper', 'Walker2d', 'HalfCheetah', 'Ant']
-    stacksizelist     = [2, 4]
-    seedlist          = [0, 1, 2, 3, 4]    
+pip install cvxpy[mosek] mosek
 ```
-
-To execute 0-th configuration, i.e. `method='BC', env='Hopper', stacksize=2, seed=0`, run:
-```
-python train.py --pid=0
-``` 
-
-### 3. Notes
-- Our code implementation is based on the following public repositories:
-    - rlkit : https://github.com/rail-berkeley/rlkit
-    - FCA : https://github.com/AlvinWen428/fighting-copycat-agents.git
-    - MINE implementation : https://github.com/mohith-sakthivel/mine-pytorch.git
-    - HSCIC implementation : https://github.com/namratadeka/circe.git
-
-
-
+- Run `cd fourrooms; python run_toy.py`
