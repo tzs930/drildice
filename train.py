@@ -387,7 +387,7 @@ if __name__ == "__main__":
     # Hyperparameter Grid
     # candidates: 'BC', 'DRBC', 'DemoDICE', 'ADVWBC', 'OPTIDICEIL', 'DrilDICE'
     method_reg_gamma_list = [
-                        ('BC',                0.,     1.0),
+                        ('DrilDICE',                0.0001,     0.99),
                     ]
 
     stacksizelist     = [0]
