@@ -17,7 +17,7 @@ pip install d4rl
 python download_d4rl_dataset.py
 ```
 
-### 2. Generate indices of subsampling method
+### 2. Generate Subsampling Indices for Covariate Shift Scenarios
 ```
 python generate_subsmaple_indices.py
 ```
