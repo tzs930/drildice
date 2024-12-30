@@ -1,6 +1,6 @@
 # Implementation Code for [DrilDICE (NeurIPS 2024)](https://openreview.net/pdf?id=lHcvjsQFQq)
 
-- This code contains official implementation codes of DrilDICE  and basellines.
+- This code contains official implementation codes of DrilDICE  and baselines for offline imitation learning.
 
 ### 1. Prerequisites
 
