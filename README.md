@@ -19,7 +19,7 @@ python download_d4rl_dataset.py
 
 ### 2. Generate Subsampling Indices for Covariate Shift Scenarios
 ```
-python generate_subsmaple_indices.py
+python generate_subsample_indices.py
 ```
 
 ### 3. Train & Evaluate DrilDICE
